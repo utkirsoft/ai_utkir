@@ -27,7 +27,7 @@ WORKDIR /app
 COPY --from=build /app/target/uai-0.0.1-SNAPSHOT.jar app.jar
 
 # Ilova ishga tushadigan portni ochamiz
-EXPOSE 8080
+EXPOSE 8081
 
 # Ilovani ishga tushirish uchun buyruq
 ENTRYPOINT ["java", "-jar", "app.jar"]
