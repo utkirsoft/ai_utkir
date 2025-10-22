@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # 1. Spring Boot Ilovasi Servisi
+  app:
+    container_name: my-spring-boot-app
+    build: . # Joriy papkadagi Dockerfile'dan image qurish
+    ports:
+      - "8080:8080" # Host portini konteyner portiga bog'lash
+    environment:
+      # Ma'lumotlar bazasiga ulanish uchun sozlamalar
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/dbutkir
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+    depends_on:
+      - db # "db" servisi ishga tushganidan so'ng ishga tushadi
+
+  # 2. PostgreSQL Ma'lumotlar bazasi servisi
+  db:
+    container_name: postgres-db
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432" # Tashqaridan ulanish uchun (ixtiyoriy)
+    environment:
+      - POSTGRES_DB=dbutkir
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Ma'lumotlarni saqlash uchun
+
+volumes:
+  postgres_data:
