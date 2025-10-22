@@ -1,0 +1,59 @@
+integration:
+  mip:
+    base-url: "https://apimgw.egov.uz:8243"
+    token-url: "https://iskm.egov.uz:9444/oauth2/token"
+    credentials:
+      grant-type: "password"
+      username: "departament-user"
+      password: "QmjLpIwtCD4kRqTuhfGb"
+      # Base64-encoded "username:password" for Basic Auth
+      basic-auth: "WUF2T1AxdlZ3SXdqdHFfMHJNOG9iWEx3WXlRYTpTTTREemZxMEFpNDB4Y3NJeTl6VVZQdHdGUFVh"
+    paths: # <-- YANGI BLOCK
+      certificate-search: "uzstandart/service/sertificate/v1"
+      financial-report: "gnk/service/finreport/v1/get-financial-report-form2"
+      facture-list-by-catalog: "gnk/service/mxik/v1/get-factura-list-by-catalog-code"
+      rental: "gnk/service/eijara/v1"
+      customs-mail: "gtk/services/pochta/v1"
+      hot-water: "teploener/service/v1/consumer"
+      auction-lot-info: "eauksion/service/v1/lot-info"
+      auction-lots: "eauksion/service/v1/lots"
+      waste: "ecology/service/v1/my-home"
+      language-certificate: "dtm/service/certificate/v1"
+      college: "minvuz/services/ortamaxsus/v2"
+      school-certificate: "xtv/services/eshahodatnoma/v2/{pin}" # {pin} - o'zgaruvchan qism
+      # static query parametrlarni ham shu yerga qo'shish mumkin
+      school-certificate-sender-pin: "35245636974164" # misol
+      student: "minvuz/services/student/info/v1"
+      diploma: "minvuz/services/diploma/v2"
+      legal-entity: "gnk/service/legalentity/v1"
+      staff-people: "labour/service/staffs/v1"
+      mib-debt: "mib/service/debtban/v1"
+      mib-ban-debt: "mib/service/debt/v1"
+      mib-alimony: "mib/service/aliment/v1"
+      narcological: "minzdrav/disp/narko/v1/by-pinpp"
+      psychological: "minzdrav/disp/psycho/v1/by-pinpp"
+      self-employment: "gnk/service/selfemployed/v1"
+      tax-person: "gnk/service/gettin/v1"
+      person-search: "gcp/docrest/v1"
+      address: "mvd/services/address/info/pin/v1"
+      work-history: "labour/service/citizenhistory/v1"
+      work-current: "labour/service/citizen/current/v1"
+      disability: "minzdrav/vtek/v4/passport"
+      physical-salary: "gnk/service/physicalsalary/v1"
+      physical-debt: "gnk/service/debtnotary/v1"
+      legal-entity-debt: "gnk/service/legalentity/debt/v1"
+      staff-count: "labour/service/staffcount/v1"
+      woman-notebook: "mahalla/service/women/v1"
+  notarial:
+    ban: # Ban (taqiq) bilan ishlash uchun
+      base-url: "http://10.190.0.162:8085/notary_ban_service/api"
+      basic-auth: "cHJvc2VjdXRvcl9kZXA6akI1X2FMeDcuUmFQczM=" # Base64(prosecutor_dep:jB5_aLx7.RaPs3)
+      paths:
+        search: "search"
+        add-ban: "ban/add"
+        cancel-ban: "ban/cancel"
+    notarial-acts: # Boshqa notarial harakatlar uchun
+      base-url: "http://10.190.0.162:8085/notary_integration_service/api"
+      basic-auth: "cHJvc2VjdXRvcl9kZXA6eU85MWtRX2ltQXlXOA==" # Base64(prosecutor_dep:yO91kQ_imAyW8)
+      paths:
+        search-actions: "search_notary_actions"
