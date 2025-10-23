@@ -62,6 +62,7 @@ public class MipApiClient {
         try {
             log.debug("Tashqi API'ga so'rov yuborilmoqda: {} {}", method, url);
             ResponseEntity<T> responseEntity = restTemplate.exchange(url, method, entity, responseType);
+            log.warn(url);
             log.debug("Tashqi API'dan javob olindi: {}", responseEntity.getStatusCode());
             return responseEntity.getBody();
 

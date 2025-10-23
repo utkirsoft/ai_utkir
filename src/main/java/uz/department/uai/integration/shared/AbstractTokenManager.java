@@ -1,6 +1,8 @@
+// integration/shared/AbstractTokenManager.java
 package uz.department.uai.integration.shared;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.RedisConnectionFailureException; // Redis xatoligi uchun import
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.web.client.ResourceAccessException;
@@ -10,6 +12,7 @@ import uz.department.uai.shared.exception.IntegrationException;
 import uz.department.uai.shared.exception.ServiceUnavailableException;
 
 import java.util.concurrent.TimeUnit;
+
 @Slf4j
 public abstract class AbstractTokenManager {
 
@@ -21,55 +24,85 @@ public abstract class AbstractTokenManager {
         this.restTemplate = restTemplate;
     }
 
-    // Bu metod o'zgarmaydi, shuning uchun "final"
+    /**
+     * Yaroqli access token'ni qaytaradi.
+     * Avval Redis'dan qidiradi. Agar topilmasa yoki Redis ishlamasa, tashqi API'dan oladi.
+     */
     public final String getAccessToken() {
-        String token = redisTemplate.opsForValue().get(getCacheKey());
-        if (token == null) {
-            System.out.println(">>> Token not found in Redis for key [" + getCacheKey() + "]. Fetching a new one...");
-            return fetchAndCacheNewToken();
+        String cacheKey = getCacheKey();
+        String token = null;
+
+        try {
+            // 1. Redis'dan tokenni o'qishga harakat qilamiz
+            token = redisTemplate.opsForValue().get(cacheKey);
+            if (token != null) {
+                log.debug(">>> Token found in Redis for key [{}]", cacheKey);
+                return token;
+            } else {
+                // Redis ishlayapti, lekin token yo'q (yoki muddati o'tgan)
+                log.info(">>> Token not found in Redis for key [{}]. Fetching a new one and trying to cache...", cacheKey);
+                return fetchAndTryCacheNewToken(); // Yangisini olib, keshga yozishga harakat qilamiz
+            }
+        } catch (RedisConnectionFailureException | IllegalStateException e) { // Redis'ga ulanish xatolarini ushlaymiz
+            // 2. Agar Redis ishlamasa
+            log.error(">>> Failed to connect to Redis while getting token for key [{}]. Fetching directly from source API...", cacheKey, e);
+            // To'g'ridan-to'g'ri API'dan olamiz (keshga yozishga harakat qilmaymiz)
+            return fetchTokenDirectlyFromSource();
+        } catch (Exception e) {
+            // Redis bilan ishlashda boshqa kutilmagan xatolar
+            log.error(">>> Unexpected error accessing Redis for key [{}]. Fetching directly from source API...", cacheKey, e);
+            return fetchTokenDirectlyFromSource();
         }
-        return token;
     }
 
-    private String fetchAndCacheNewToken() {
-        TokenResponse response = fetchTokenFromSource();
+    /**
+     * Tashqi API'dan yangi token oladi va uni Redis'ga yozishga HARAKAT qiladi.
+     * Agar Redis'ga yozishda xato bo'lsa, xatoni loglaydi, lekin tokenni baribir qaytaradi.
+     */
+    private String fetchAndTryCacheNewToken() {
+        String cacheKey = getCacheKey();
+        TokenResponse response = fetchTokenFromSource(); // Bu metod API xatolarini ushlaydi
         if (response == null || response.getAccessToken() == null) {
-            throw new RuntimeException("Could not fetch access token for " + getCacheKey());
+            throw new IntegrationException(String.format("Could not retrieve access token details for %s", cacheKey), null);
         }
 
         String newToken = response.getAccessToken();
         long expiresIn = response.getExpiresIn();
         long ttlInSeconds = (expiresIn > 60) ? expiresIn - 60 : expiresIn; // Xavfsizlik buferi
 
-        redisTemplate.opsForValue().set(getCacheKey(), newToken, ttlInSeconds, TimeUnit.SECONDS);
-        System.out.println(">>> Successfully cached new token in Redis for key [" + getCacheKey() + "]. TTL: " + ttlInSeconds + "s.");
+        try {
+            // Redis'ga yozishga harakat qilamiz
+            redisTemplate.opsForValue().set(cacheKey, newToken, ttlInSeconds, TimeUnit.SECONDS);
+            log.info(">>> Successfully fetched and cached new token in Redis for key [{}]. TTL: {}s.", cacheKey, ttlInSeconds);
+        } catch (Exception e) {
+            // Agar Redis'ga yozishda xato bo'lsa, xatoni loglaymiz, lekin exception tashlamaymiz
+            log.error(">>> Successfully fetched token for key [{}], BUT FAILED TO CACHE in Redis. Returning token without caching.", cacheKey, e);
+        }
 
-        return newToken;
+        return newToken; // Yangi olingan tokenni baribir qaytaramiz
     }
 
-    // Har bir merosxo'r o'zi uchun implement qilishi SHART bo'lgan metodlar
-
     /**
-     * @return Redis'da token saqlanadigan unikal kalit (masalan, "api:mip:token")
+     * Tashqi API'dan yangi token oladi (Redis'ga yozishga harakat qilmaydi).
+     * Bu metod Redis ishlamay qolganda chaqiriladi.
      */
+    private String fetchTokenDirectlyFromSource() {
+        String cacheKey = getCacheKey();
+        TokenResponse response = fetchTokenFromSource(); // Bu metod API xatolarini ushlaydi
+        if (response == null || response.getAccessToken() == null) {
+            throw new IntegrationException(String.format("Could not retrieve access token details for %s even when fetching directly.", cacheKey), null);
+        }
+        log.warn(">>> Successfully fetched token directly from source API for key [{}]. Token was NOT cached because Redis is unavailable.", cacheKey);
+        return response.getAccessToken();
+    }
+
+
+    // --- Qolgan metodlar o'zgarishsiz qoladi ---
     protected abstract String getCacheKey();
-
-    /**
-     * @return Token olish uchun yuboriladigan so'rov (URL, Headers, Body)
-     */
     protected abstract HttpEntity<?> buildTokenRequest();
-
-    /**
-     * @return Token olish uchun API manzili
-     */
     protected abstract String getTokenUrl();
-
-    /**
-     * @return Javobni qabul qilib oladigan DTO klassi
-     */
     protected abstract Class<? extends TokenResponse> getResponseType();
 
-    // Bu metodni chaqirib, tokenni olamiz
     private TokenResponse fetchTokenFromSource() {
         String url = getTokenUrl();
         HttpEntity<?> requestEntity = buildTokenRequest();
@@ -81,22 +114,17 @@ public abstract class AbstractTokenManager {
             log.debug("Successfully fetched token for key [{}]", getCacheKey());
             return response;
         } catch (ResourceAccessException e) {
-            // Tarmoq xatoliklarini ushlaymiz (DNS, Timeout, Connection Refused)
             log.error("Network error while fetching token for key [{}]. URL: {}", getCacheKey(), url, e);
-            throw new ServiceUnavailableException(getCacheKey() + " (Token Service)", e); // <-- MUHIM O'ZGARISH
+            throw new ServiceUnavailableException(getCacheKey() + " (Token Service)", e);
         } catch (RestClientException e) {
-            // Boshqa RestTemplate xatoliklari (masalan, 4xx, 5xx javoblar token olishda)
             log.error("Client/Server error while fetching token for key [{}]. URL: {}. Error: {}", getCacheKey(), url, e.getMessage());
-            // Bu yerda ham aniqroq exception tashlash mumkin, masalan 4xx uchun alohida
             throw new IntegrationException(String.format("Error fetching token for %s: %s", getCacheKey(), e.getMessage()), e);
         } catch (Exception e) {
-            // Boshqa kutilmagan xatoliklar
             log.error("Unexpected error while fetching token for key [{}]. URL: {}", getCacheKey(), url, e);
             throw new IntegrationException(String.format("Unexpected error fetching token for %s: %s", getCacheKey(), e.getMessage()), e);
         }
     }
 
-    // Barcha javob DTO'lari implement qilishi kerak bo'lgan umumiy interfeys
     public interface TokenResponse {
         String getAccessToken();
         long getExpiresIn();
