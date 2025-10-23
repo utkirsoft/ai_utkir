@@ -34,6 +34,7 @@ public abstract class AbstractTokenManager {
         try {
             // 1. Redis'dan tokenni o'qishga harakat qilamiz
             token = redisTemplate.opsForValue().get(cacheKey);
+            log.info("✅ Successfully get token from Redis. by {}", cacheKey); // Muvaffaqiyatli ulanish logi
 
             // Agar Redis bilan ulanish muvaffaqiyatli bo'lsa (xatolik bo'lmadi)
             // va bu haqida hali log yozilmagan bo'lsa:
