@@ -6,15 +6,20 @@ services:
     container_name: my-spring-boot-app
     build: . # Joriy papkadagi Dockerfile'dan image qurish
     ports:
-      - "8080:8080" # Host portini konteyner portiga bog'lash
+      - "8081:8081" # Host portini konteyner portiga bog'lash
     environment:
       # Ma'lumotlar bazasiga ulanish uchun sozlamalar
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/dbutkir
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
     depends_on:
       - db # "db" servisi ishga tushganidan so'ng ishga tushadi
+      - redis
+    networks:
+      - uai_network
 
   # 2. PostgreSQL Ma'lumotlar bazasi servisi
   db:
@@ -28,6 +33,20 @@ services:
       - POSTGRES_PASSWORD=postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data # Ma'lumotlarni saqlash uchun
+    networks:
+      - uai_network
+  # 3. Redis
+  redis:
+    container_name: redis-cache
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - uai_network
 
 volumes:
   postgres_data:
+
+networks:
+  uai_network:
+    driver: bridge
